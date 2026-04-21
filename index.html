@@ -764,7 +764,7 @@ setReturning(false);setDistReturn(null);
       if(next>=points.length){
         /* Toutes les énigmes résolues → retour au point de départ */
         setReturning(true);
-        setDProg(0);  // reset slider démo pour simuler le retour
+        // setDProg(0);  // reset slider démo pour simuler le retour (fonction non définie, retirée)
       } else {
         setAIdx(p=>Math.min(p+1,points.length-1));
       }
@@ -783,7 +783,7 @@ setReturning(false);setDistReturn(null);
 
   const resetGame=()=>{
     if(geoRef.current!==null&&"geolocation"in navigator){navigator.geolocation.clearWatch(geoRef.current);geoRef.current=null;}
-    setStage("intro");setMapOpen(false);setMode("field");setLevel(null);
+    setStage("intro");setMapOpen(false);setLevel(null);
     setPoints([]);setAIdx(0);setUserPos(null);setDist(null);setGeoErr(null);
     setUnlocked([]);setSolved([]);setTokens([]);
     setObjective(null);setGuess("");setGuessFb(null);
@@ -830,8 +830,7 @@ setReturning(false);setDistReturn(null);
               <h1 style={{fontSize:"clamp(1.7rem,5vw,2.4rem)",lineHeight:1.1}}>Retrouve le Trésor Maudit du Lac der</h1>
               {/* Portrait du capitaine */}
               <div style={{borderRadius:16,overflow:"hidden",border:"1.5px solid rgba(64,32,12,.4)",boxShadow:"0 6px 20px rgba(0,0,0,.3)",background:"linear-gradient(145deg,#fef6df,#f0c78d)"}}>
-                <img src="images/pirate-map.png" alt={`${CAPTAIN} avec sa carte`}
-                  style={{width:"100%",display:"block",objectFit:"cover",maxHeight:200}}/>
+                <div style={{width:"100%",display:"block",objectFit:"cover",maxHeight:200,textAlign:"center",padding:"1rem",fontSize:"3rem",background:"#f0c78d"}}>🗺️</div>
                 <p style={{textAlign:"center",fontStyle:"italic",fontSize:".78rem",color:"#4b2a17",padding:".5rem 1rem"}}>
                   {CAPTAIN} t'attend au ponton du lac.
                 </p>
@@ -1220,11 +1219,9 @@ setReturning(false);setDistReturn(null);
             <div style={{...S.col,gap:"1.25rem"}}>
               {/* Portrait du capitaine selon l'humeur */}
               <div style={{borderRadius:20,overflow:"hidden",border:"2px solid rgba(64,32,12,.4)",boxShadow:"0 8px 24px rgba(0,0,0,.35)",background:"linear-gradient(145deg,#fef6df,#f0c78d)"}}>
-                <img
-                  src={mood==="success"?"images/pirate-chest-open.png":mood==="failure"?"images/pirate-cry.png":"images/pirate-map.png"}
-                  alt={mood==="success"?"Coffre ouvert":mood==="failure"?"Capitaine déçu":"Capitaine avec carte"}
-                  style={{width:"100%",display:"block",objectFit:"cover",maxHeight:220}}
-                />
+                <div style={{width:"100%",display:"block",objectFit:"cover",maxHeight:220,textAlign:"center",padding:"1rem",fontSize:"3rem",background:"#f0c78d"}}>
+                  {mood==="success"?"🏆":mood==="failure"?"😢":"🗺️"}
+                </div>
                 <p style={{textAlign:"center",fontStyle:"italic",fontSize:".85rem",color:"#4b2a17",padding:".6rem 1rem"}}>
                   {mood==="success"?`${CAPTAIN} ouvre le coffre et partage son trésor.`:mood==="failure"?`${CAPTAIN} verse une larme : ce mot n'est pas le bon.`:`${CAPTAIN} attend que tu annonces le mot secret.`}
                 </p>
@@ -1297,7 +1294,7 @@ setReturning(false);setDistReturn(null);
               </div>
 
               <div style={{display:"flex",gap:".75rem",flexWrap:"wrap"}}>
-                <button className="btn btn-gold"  style={{flex:1,minWidth:140,padding:".8rem"}} onClick={()=>level&&startGame(level,mode)}>Relancer une partie</button>
+                <button className="btn btn-gold"  style={{flex:1,minWidth:140,padding:".8rem"}} onClick={()=>level&&startGame(level)}>Relancer une partie</button>
                 <button className="btn btn-ghost" style={{flex:1,minWidth:140}} onClick={resetGame}>Retour à l'accueil</button>
               </div>
             </div>
@@ -1365,7 +1362,7 @@ function showInstallBanner() {
       font-family:'IM Fell English',serif;color:#fef3c7;
       box-shadow:0 -4px 24px rgba(0,0,0,.5);
     ">
-      <img src="icons/icon-72.png" width="44" height="44" style="border-radius:10px;flex-shrink:0" alt="icône"/>
+      <div style="width:44px;height:44px;border-radius:10px;flex-shrink:0;background:#f0c78d;display:flex;align-items:center;justify-content:center;font-size:28px;">⚓</div>
       <div style="flex:1;min-width:0">
         <p style="font-family:'Pirata One',serif;font-size:.95rem;margin:0 0 2px;color:#f7c560">
           ⚓ Installer Pirate Quest
