@@ -6,9 +6,9 @@
    - APIs externes (fonts, Leaflet, React) : Stale While Revalidate
    ================================================================ */
 
-const CACHE_VERSION    = 'pirate-quest-v3';
-const TILE_CACHE       = 'pirate-tiles-v3';
-const ASSETS_CACHE     = 'pirate-assets-v3';
+const CACHE_VERSION    = 'pirate-quest-v4';
+const TILE_CACHE       = 'pirate-tiles-v4';
+const ASSETS_CACHE     = 'pirate-assets-v4';
 
 /* Assets à précacher au moment de l'installation */
 const PRECACHE_ASSETS = [
