@@ -142,8 +142,13 @@ input[type=text]::placeholder{color:#8a6040}
 /* Compass */
 .compass-wrap{position:relative;width:240px;height:240px;flex-shrink:0}
 /* Cadran extérieur — tourne avec le cap du téléphone */
-.compass-dial{position:absolute;inset:0;transition:transform .15s ease-out}
-will-change: transform;
+.compass-dial{
+  position:absolute;
+  inset:0;
+  transform-origin:50% 50%;
+  transition:transform .1s linear;
+  will-change: transform;
+}
 /* Boîtier fixe */
 .compass-body{position:absolute;inset:0;border-radius:50%;
   border:10px solid #2b1608;
@@ -608,10 +613,13 @@ function havDist(a, b) {
   return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
 }
 function bearing(f, t) {
-  const la1 = toRad(f.lat),
-    la2 = toRad(t.lat),
-    dl = toRad(t.lng - f.lng);
-  return (toDeg(Math.atan2(Math.sin(dl) * Math.cos(la2), Math.cos(la1) * Math.sin(la2) - Math.sin(la1) * Math.cos(la2) * Math.cos(dl))) + 360) % 360;
+  const la1 = toRad(f.lat);
+  const la2 = toRad(t.lat);
+  const dl = toRad(t.lng - f.lng);
+  const y = Math.sin(dl) * Math.cos(la2);
+  const x = Math.cos(la1) * Math.sin(la2) - Math.sin(la1) * Math.cos(la2) * Math.cos(dl);
+  const brg = toDeg(Math.atan2(y, x));
+  return (brg + 360) % 360;
 }
 function lerp(a, b, t) {
   const c = Math.min(1, Math.max(0, t));
@@ -706,7 +714,7 @@ function PirateMap({
   const capRef = useRef(null);
   const wakeRef = useRef(null);
   const wakePts = useRef([]);
-  const startMkRef = useRef(null); // marqueur départ clignotant (phase returning)
+  const startMkRef = useRef(null);
 
   /* Icône bateau */
   const makeBoatIcon = useCallback(angleDeg => {
@@ -732,7 +740,7 @@ function PirateMap({
     });
   }, []);
 
-  /* Icône point de départ pulsant (phase returning) */
+  /* Icône point de départ pulsant */
   const makeStartIcon = useCallback(() => {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="-24 -24 48 48">
       <circle r="20" fill="#fbbf24" fill-opacity=".25" stroke="none">
@@ -772,7 +780,7 @@ function PirateMap({
 
   /* Initialisation de la carte */
   useEffect(() => {
-    if (mapRef.current) return; // déjà initialisée
+    if (mapRef.current) return;
     const el = document.getElementById(mapId);
     if (!el) return;
     const map = L.map(el, {
@@ -782,14 +790,12 @@ function PirateMap({
       attributionControl: true
     });
 
-    /* Tuile CartoDB Voyager — rendu neutre et propre, filtre CSS fait le travail pirate */
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
       subdomains: 'abcd',
       maxZoom: 19
     }).addTo(map);
 
-    /* Couverture bleue sur toute la carte pour simuler l'eau (masquée hors zone) */
     L.rectangle([[BOUNDS.minLat - 0.02, BOUNDS.minLng - 0.02], [BOUNDS.maxLat + 0.02, BOUNDS.maxLng + 0.02]], {
       color: 'transparent',
       weight: 0,
@@ -797,7 +803,6 @@ function PirateMap({
       fillOpacity: .18
     }).addTo(map);
 
-    /* Zone de jeu — liseré épais + remplissage clair style vieille carte */
     const zone = L.polygon(PLAY_ZONE.map(p => [p.lat, p.lng]), {
       color: '#5c2c0a',
       weight: 3.5,
@@ -809,7 +814,6 @@ function PirateMap({
     }).addTo(map);
     zoneRef.current = zone;
 
-    /* Zoom sur la zone */
     map.fitBounds(zone.getBounds(), {
       padding: [30, 30]
     });
@@ -825,11 +829,9 @@ function PirateMap({
     const map = mapRef.current;
     if (!map) return;
 
-    /* Supprimer anciens marqueurs */
     wpsRef.current.forEach(m => m.remove());
     wpsRef.current = [];
 
-    /* Supprimer ancien tracé */
     if (routeRef.current) {
       routeRef.current.remove();
       routeRef.current = null;
@@ -840,7 +842,6 @@ function PirateMap({
     }
     if (!points.length) return;
 
-    /* Marqueur permanent du ponton de départ ★ */
     const deptSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="38" height="46" viewBox="-19 -32 38 46">
       <circle r="11" fill="#fef3c7" stroke="#92400e" stroke-width="2"/>
       <text x="0" y="4" text-anchor="middle" font-size="12" fill="#b45309" font-family="serif">★</text>
@@ -858,7 +859,6 @@ function PirateMap({
     }).bindPopup('<div style="font-family:Pirata One,serif;color:#4a2510;font-size:.85rem;padding:4px">⚓ Ponton de départ</div>').addTo(map);
     wpsRef.current.push(deptMk);
 
-    /* Tracé : ponton → balise 1 → balise 2 → … (reprend la logique SVG originale) */
     const fullRoute = [[PLAY_ZONE[0].lat, PLAY_ZONE[0].lng], ...points.map(p => [p.location.lat, p.location.lng])];
     routeRef.current = L.polyline(fullRoute, {
       color: '#7a3912',
@@ -867,7 +867,6 @@ function PirateMap({
       dashArray: '8 5'
     }).addTo(map);
 
-    /* Ligne verte spéciale ponton → balise 1 (comme dans l'original SVG) */
     const greenLeg = L.polyline([[PLAY_ZONE[0].lat, PLAY_ZONE[0].lng], [points[0].location.lat, points[0].location.lng]], {
       color: '#15803d',
       weight: 2.5,
@@ -876,13 +875,12 @@ function PirateMap({
     }).addTo(map);
     wpsRef.current.push(greenLeg);
 
-    /* Marqueurs waypoints */
     points.forEach((pt, idx) => {
       const isSolved = solvedIds.includes(pt.id);
       const isCurrent = idx === activeIdx;
+      
       const icon = makeWpIcon(idx + 1, isCurrent, isSolved);
 
-      /* Popup pirate */
       const pop = L.popup({
         className: 'pirate-popup'
       }).setContent(`<div style="font-family:Pirata One,serif;color:#4a2510;font-size:.85rem;padding:4px 2px">
@@ -895,7 +893,6 @@ function PirateMap({
       wpsRef.current.push(mk);
     });
 
-    /* Ligne de cap bateau → balise active */
     if (userPos && points[activeIdx] && !solvedIds.includes(points[activeIdx].id)) {
       const tgt = points[activeIdx];
       capRef.current = L.polyline([[userPos.lat, userPos.lng], [tgt.location.lat, tgt.location.lng]], {
@@ -911,8 +908,6 @@ function PirateMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !userPos) return;
-
-    /* Sillage */
     wakePts.current.push([userPos.lat, userPos.lng]);
     if (wakePts.current.length > 30) wakePts.current.shift();
     if (wakeRef.current) {
@@ -926,14 +921,11 @@ function PirateMap({
         dashArray: '4 3'
       }).addTo(map);
     }
-
-    /* Angle vers la balise cible */
     let angleDeg = 0;
     if (points[activeIdx] && !solvedIds.includes(points[activeIdx].id)) {
       angleDeg = bearing(userPos, points[activeIdx].location);
     }
 
-    /* Marqueur bateau */
     const icon = makeBoatIcon(angleDeg);
     if (boatRef.current) {
       boatRef.current.setLatLng([userPos.lat, userPos.lng]);
@@ -944,18 +936,12 @@ function PirateMap({
         zIndexOffset: 1000
       }).addTo(map);
     }
-
-    /* Cercle de précision */
-    /* On ne crée pas de cercle statique séparé pour éviter la surcharge visuelle
-       Le halo SVG du marqueur le représente implicitement */
   }, [userPos, points, activeIdx, solvedIds, makeBoatIcon]);
 
-  /* Réinitialiser sillage quand la balise change */
   useEffect(() => {
     wakePts.current = [];
   }, [activeIdx]);
 
-  /* Marqueur ★ départ — visible uniquement en phase returning */
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -966,7 +952,6 @@ function PirateMap({
           zIndexOffset: 900
         }).addTo(map);
       }
-      /* Tracer la ligne de retour depuis la position actuelle */
       if (capRef.current) {
         capRef.current.remove();
         capRef.current = null;
@@ -987,7 +972,6 @@ function PirateMap({
     }
   }, [returning, userPos, makeStartIcon]);
 
-  /* Nettoyage bateau quand plus de position */
   useEffect(() => {
     if (!userPos && boatRef.current) {
       boatRef.current.remove();
@@ -995,11 +979,9 @@ function PirateMap({
     }
   }, [userPos]);
 
-  /* Centrage automatique sur le bateau en mode terrain */
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !userPos) return;
-    /* Seulement si hors du viewport visible */
     if (!map.getBounds().contains([userPos.lat, userPos.lng])) {
       map.panTo([userPos.lat, userPos.lng], {
         animate: true,
@@ -1007,6 +989,7 @@ function PirateMap({
       });
     }
   }, [userPos]);
+
   return /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative"
@@ -1103,6 +1086,7 @@ function PirateMap({
 function App() {
   const [stage, setStage] = useState("intro");
   const [level, setLevel] = useState(null);
+  const [mode, setMode] = useState("field");
   const [points, setPoints] = useState([]);
   const [aIdx, setAIdx] = useState(0);
   const [userPos, setUserPos] = useState(null);
@@ -1180,41 +1164,34 @@ function App() {
       setOPerm("denied");
     }
   }, []);
-  useEffect(() => {
+useEffect(() => {
   if (oPerm !== "granted") return;
 
-  let lastHeading = 0;
-  let smoothHeading = 0;
-  const SMOOTH_FACTOR = 0.15; // plus petit = plus stable
+  let smooth = 0;
+  let velocity = 0;
+  const SMOOTH = 0.12;
+  const DAMPING = 0.85;
 
   const handler = (e) => {
-    let deg = null;
+    let raw = null;
 
-    // ✅ iOS (très fiable)
     if (typeof e.webkitCompassHeading === "number") {
-      deg = e.webkitCompassHeading;
-
-    // ✅ Android (corrigé)
+      raw = e.webkitCompassHeading;
     } else if (typeof e.alpha === "number") {
-      const screenOrientation = window.orientation || 0;
-      deg = e.alpha;
-
-      // Correction orientation écran
-      deg = (deg + screenOrientation) % 360;
-
-      // Inversion sens
-      deg = (360 - deg) % 360;
+      let deg = e.alpha;
+      const screen = window.orientation || 0;
+      deg = (deg + screen) % 360;
+      raw = (360 - deg) % 360;
     }
 
-    if (deg === null) return;
+    if (raw === null) return;
 
-    // ✅ FILTRE ANTI-TREMBLEMENT (low-pass filter)
-    const delta = ((deg - lastHeading + 540) % 360) - 180;
-    smoothHeading = (smoothHeading + delta * SMOOTH_FACTOR + 360) % 360;
+    let delta = ((raw - smooth + 540) % 360) - 180;
+    velocity += delta * SMOOTH;
+    velocity *= DAMPING;
+    smooth = (smooth + velocity + 360) % 360;
 
-    lastHeading = smoothHeading;
-
-    setHeading(smoothHeading);
+    setHeading(smooth);
   };
 
   window.addEventListener("deviceorientationabsolute", handler, true);
@@ -1225,6 +1202,8 @@ function App() {
     window.removeEventListener("deviceorientation", handler, true);
   };
 }, [oPerm]);
+
+  
 
   /* GPS terrain */
   useEffect(() => {
@@ -1386,7 +1365,7 @@ function App() {
       if (next >= points.length) {
         /* Toutes les énigmes résolues → retour au point de départ */
         setReturning(true);
-        setDProg(0); // reset slider démo pour simuler le retour
+        
       } else {
         setAIdx(p => Math.min(p + 1, points.length - 1));
       }
@@ -2165,7 +2144,7 @@ function App() {
       /*#__PURE__*/React.createElement("circle", {cx:"120",cy:"120",r:"115",fill:"url(#cgRing)",filter:"url(#cgShadow)"}),
       /* Graduation extérieure — 72 traits (5° chacun) */
       ...Array.from({length:72},(_,i)=>{
-        const a = (i*5 - heading) * Math.PI/180;
+        const a = (i*5 + heading) * Math.PI/180;
         const major = i%18===0, mid = i%9===0;
         const r1 = major?92:mid?95:97, r2=108;
         return /*#__PURE__*/React.createElement("line", {
@@ -2178,7 +2157,7 @@ function App() {
       }),
       /* Points cardinaux sur le cadran tournant */
       ...["N","E","S","O"].map((label,i)=>{
-        const a = (i*90 - heading) * Math.PI/180;
+        const a = (i*90 + heading) * Math.PI/180;
         const r = 80;
         const isNord = label==="N";
         return /*#__PURE__*/React.createElement("text", {
@@ -2195,7 +2174,7 @@ function App() {
       }),
       /* Points intermédiaires NE/SE/SO/NO */
       ...["NE","SE","SO","NO"].map((label,i)=>{
-        const a = ((i*90+45) - heading) * Math.PI/180;
+        const a = ((i*90+45) + heading) * Math.PI/180;
         const r = 80;
         return /*#__PURE__*/React.createElement("text", {
           key:"inter"+i,
