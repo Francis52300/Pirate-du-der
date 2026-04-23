@@ -142,7 +142,8 @@ input[type=text]::placeholder{color:#8a6040}
 /* Compass */
 .compass-wrap{position:relative;width:240px;height:240px;flex-shrink:0}
 /* Cadran extérieur — tourne avec le cap du téléphone */
-.compass-dial{position:absolute;inset:0;transition:transform .35s ease-out}
+.compass-dial{position:absolute;inset:0;transition:transform .15s ease-out}
+will-change: transform;
 /* Boîtier fixe */
 .compass-body{position:absolute;inset:0;border-radius:50%;
   border:10px solid #2b1608;
@@ -1180,27 +1181,50 @@ function App() {
     }
   }, []);
   useEffect(() => {
-    if (oPerm !== "granted") return;
-    const h = e => {
-      // iOS : webkitCompassHeading = cap magnétique réel (0=Nord, croissant vers l'Est)
-      // Android : alpha = rotation Z du téléphone (0=Nord quand à plat, sens anti-horaire)
-      let deg = 0;
-      if (typeof e.webkitCompassHeading === "number") {
-        // iOS — cap direct, déjà compensé pour l'inclinaison
-        deg = e.webkitCompassHeading;
-      } else if (typeof e.alpha === "number") {
-        // Android — alpha augmente dans le sens anti-horaire, on inverse
-        deg = (360 - e.alpha) % 360;
-      }
-      setHeading(deg);
-    };
-    window.addEventListener("deviceorientationabsolute", h, true);
-    window.addEventListener("deviceorientation", h, true);
-    return () => {
-      window.removeEventListener("deviceorientationabsolute", h, true);
-      window.removeEventListener("deviceorientation", h, true);
-    };
-  }, [oPerm]);
+  if (oPerm !== "granted") return;
+
+  let lastHeading = 0;
+  let smoothHeading = 0;
+  const SMOOTH_FACTOR = 0.15; // plus petit = plus stable
+
+  const handler = (e) => {
+    let deg = null;
+
+    // ✅ iOS (très fiable)
+    if (typeof e.webkitCompassHeading === "number") {
+      deg = e.webkitCompassHeading;
+
+    // ✅ Android (corrigé)
+    } else if (typeof e.alpha === "number") {
+      const screenOrientation = window.orientation || 0;
+      deg = e.alpha;
+
+      // Correction orientation écran
+      deg = (deg + screenOrientation) % 360;
+
+      // Inversion sens
+      deg = (360 - deg) % 360;
+    }
+
+    if (deg === null) return;
+
+    // ✅ FILTRE ANTI-TREMBLEMENT (low-pass filter)
+    const delta = ((deg - lastHeading + 540) % 360) - 180;
+    smoothHeading = (smoothHeading + delta * SMOOTH_FACTOR + 360) % 360;
+
+    lastHeading = smoothHeading;
+
+    setHeading(smoothHeading);
+  };
+
+  window.addEventListener("deviceorientationabsolute", handler, true);
+  window.addEventListener("deviceorientation", handler, true);
+
+  return () => {
+    window.removeEventListener("deviceorientationabsolute", handler, true);
+    window.removeEventListener("deviceorientation", handler, true);
+  };
+}, [oPerm]);
 
   /* GPS terrain */
   useEffect(() => {
