@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
-<title>Pirate Quest — Lac du Der</title>
+<title>Trésor Pirate  — Lac du Der</title>
 
 <!-- PWA Manifest -->
 <link rel="manifest" href="manifest.json"/>
@@ -11,7 +11,7 @@
 <!-- iOS PWA support -->
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="apple-mobile-web-app-title" content="Pirate Quest"/>
+<meta name="apple-mobile-web-app-title" content="Trésor Pirate"/>
 <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png"/>
 <link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192.png"/>
 
@@ -23,7 +23,7 @@
 
 <!-- SEO / partage -->
 <meta name="description" content="Jeu de chasse au trésor GPS sur le Lac du Der avec le Capitaine Francis BlackWood"/>
-<meta name="application-name" content="Pirate Quest"/>
+<meta name="application-name" content="TrésorPirate"/>
 
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -142,13 +142,7 @@ input[type=text]::placeholder{color:#8a6040}
 /* Compass */
 .compass-wrap{position:relative;width:240px;height:240px;flex-shrink:0}
 /* Cadran extérieur — tourne avec le cap du téléphone */
-.compass-dial{
-  position:absolute;
-  inset:0;
-  transform-origin:50% 50%;
-  transition:transform .1s linear;
-  will-change: transform;
-}
+.compass-dial{position:absolute;inset:0;transition:transform .35s ease-out}
 /* Boîtier fixe */
 .compass-body{position:absolute;inset:0;border-radius:50%;
   border:10px solid #2b1608;
@@ -613,13 +607,10 @@ function havDist(a, b) {
   return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
 }
 function bearing(f, t) {
-  const la1 = toRad(f.lat);
-  const la2 = toRad(t.lat);
-  const dl = toRad(t.lng - f.lng);
-  const y = Math.sin(dl) * Math.cos(la2);
-  const x = Math.cos(la1) * Math.sin(la2) - Math.sin(la1) * Math.cos(la2) * Math.cos(dl);
-  const brg = toDeg(Math.atan2(y, x));
-  return (brg + 360) % 360;
+  const la1 = toRad(f.lat),
+    la2 = toRad(t.lat),
+    dl = toRad(t.lng - f.lng);
+  return (toDeg(Math.atan2(Math.sin(dl) * Math.cos(la2), Math.cos(la1) * Math.sin(la2) - Math.sin(la1) * Math.cos(la2) * Math.cos(dl))) + 360) % 360;
 }
 function lerp(a, b, t) {
   const c = Math.min(1, Math.max(0, t));
@@ -714,7 +705,7 @@ function PirateMap({
   const capRef = useRef(null);
   const wakeRef = useRef(null);
   const wakePts = useRef([]);
-  const startMkRef = useRef(null);
+  const startMkRef = useRef(null); // marqueur départ clignotant (phase returning)
 
   /* Icône bateau */
   const makeBoatIcon = useCallback(angleDeg => {
@@ -740,7 +731,7 @@ function PirateMap({
     });
   }, []);
 
-  /* Icône point de départ pulsant */
+  /* Icône point de départ pulsant (phase returning) */
   const makeStartIcon = useCallback(() => {
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="-24 -24 48 48">
       <circle r="20" fill="#fbbf24" fill-opacity=".25" stroke="none">
@@ -780,7 +771,7 @@ function PirateMap({
 
   /* Initialisation de la carte */
   useEffect(() => {
-    if (mapRef.current) return;
+    if (mapRef.current) return; // déjà initialisée
     const el = document.getElementById(mapId);
     if (!el) return;
     const map = L.map(el, {
@@ -790,12 +781,14 @@ function PirateMap({
       attributionControl: true
     });
 
+    /* Tuile CartoDB Voyager — rendu neutre et propre, filtre CSS fait le travail pirate */
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
       subdomains: 'abcd',
       maxZoom: 19
     }).addTo(map);
 
+    /* Couverture bleue sur toute la carte pour simuler l'eau (masquée hors zone) */
     L.rectangle([[BOUNDS.minLat - 0.02, BOUNDS.minLng - 0.02], [BOUNDS.maxLat + 0.02, BOUNDS.maxLng + 0.02]], {
       color: 'transparent',
       weight: 0,
@@ -803,6 +796,7 @@ function PirateMap({
       fillOpacity: .18
     }).addTo(map);
 
+    /* Zone de jeu — liseré épais + remplissage clair style vieille carte */
     const zone = L.polygon(PLAY_ZONE.map(p => [p.lat, p.lng]), {
       color: '#5c2c0a',
       weight: 3.5,
@@ -814,6 +808,7 @@ function PirateMap({
     }).addTo(map);
     zoneRef.current = zone;
 
+    /* Zoom sur la zone */
     map.fitBounds(zone.getBounds(), {
       padding: [30, 30]
     });
@@ -829,9 +824,11 @@ function PirateMap({
     const map = mapRef.current;
     if (!map) return;
 
+    /* Supprimer anciens marqueurs */
     wpsRef.current.forEach(m => m.remove());
     wpsRef.current = [];
 
+    /* Supprimer ancien tracé */
     if (routeRef.current) {
       routeRef.current.remove();
       routeRef.current = null;
@@ -842,6 +839,7 @@ function PirateMap({
     }
     if (!points.length) return;
 
+    /* Marqueur permanent du ponton de départ ★ */
     const deptSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="38" height="46" viewBox="-19 -32 38 46">
       <circle r="11" fill="#fef3c7" stroke="#92400e" stroke-width="2"/>
       <text x="0" y="4" text-anchor="middle" font-size="12" fill="#b45309" font-family="serif">★</text>
@@ -859,6 +857,7 @@ function PirateMap({
     }).bindPopup('<div style="font-family:Pirata One,serif;color:#4a2510;font-size:.85rem;padding:4px">⚓ Ponton de départ</div>').addTo(map);
     wpsRef.current.push(deptMk);
 
+    /* Tracé : ponton → balise 1 → balise 2 → … (reprend la logique SVG originale) */
     const fullRoute = [[PLAY_ZONE[0].lat, PLAY_ZONE[0].lng], ...points.map(p => [p.location.lat, p.location.lng])];
     routeRef.current = L.polyline(fullRoute, {
       color: '#7a3912',
@@ -867,6 +866,7 @@ function PirateMap({
       dashArray: '8 5'
     }).addTo(map);
 
+    /* Ligne verte spéciale ponton → balise 1 (comme dans l'original SVG) */
     const greenLeg = L.polyline([[PLAY_ZONE[0].lat, PLAY_ZONE[0].lng], [points[0].location.lat, points[0].location.lng]], {
       color: '#15803d',
       weight: 2.5,
@@ -875,12 +875,13 @@ function PirateMap({
     }).addTo(map);
     wpsRef.current.push(greenLeg);
 
+    /* Marqueurs waypoints */
     points.forEach((pt, idx) => {
       const isSolved = solvedIds.includes(pt.id);
       const isCurrent = idx === activeIdx;
-      
       const icon = makeWpIcon(idx + 1, isCurrent, isSolved);
 
+      /* Popup pirate */
       const pop = L.popup({
         className: 'pirate-popup'
       }).setContent(`<div style="font-family:Pirata One,serif;color:#4a2510;font-size:.85rem;padding:4px 2px">
@@ -893,6 +894,7 @@ function PirateMap({
       wpsRef.current.push(mk);
     });
 
+    /* Ligne de cap bateau → balise active */
     if (userPos && points[activeIdx] && !solvedIds.includes(points[activeIdx].id)) {
       const tgt = points[activeIdx];
       capRef.current = L.polyline([[userPos.lat, userPos.lng], [tgt.location.lat, tgt.location.lng]], {
@@ -908,6 +910,8 @@ function PirateMap({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !userPos) return;
+
+    /* Sillage */
     wakePts.current.push([userPos.lat, userPos.lng]);
     if (wakePts.current.length > 30) wakePts.current.shift();
     if (wakeRef.current) {
@@ -921,11 +925,14 @@ function PirateMap({
         dashArray: '4 3'
       }).addTo(map);
     }
+
+    /* Angle vers la balise cible */
     let angleDeg = 0;
     if (points[activeIdx] && !solvedIds.includes(points[activeIdx].id)) {
       angleDeg = bearing(userPos, points[activeIdx].location);
     }
 
+    /* Marqueur bateau */
     const icon = makeBoatIcon(angleDeg);
     if (boatRef.current) {
       boatRef.current.setLatLng([userPos.lat, userPos.lng]);
@@ -936,12 +943,18 @@ function PirateMap({
         zIndexOffset: 1000
       }).addTo(map);
     }
+
+    /* Cercle de précision */
+    /* On ne crée pas de cercle statique séparé pour éviter la surcharge visuelle
+       Le halo SVG du marqueur le représente implicitement */
   }, [userPos, points, activeIdx, solvedIds, makeBoatIcon]);
 
+  /* Réinitialiser sillage quand la balise change */
   useEffect(() => {
     wakePts.current = [];
   }, [activeIdx]);
 
+  /* Marqueur ★ départ — visible uniquement en phase returning */
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -952,6 +965,7 @@ function PirateMap({
           zIndexOffset: 900
         }).addTo(map);
       }
+      /* Tracer la ligne de retour depuis la position actuelle */
       if (capRef.current) {
         capRef.current.remove();
         capRef.current = null;
@@ -972,6 +986,7 @@ function PirateMap({
     }
   }, [returning, userPos, makeStartIcon]);
 
+  /* Nettoyage bateau quand plus de position */
   useEffect(() => {
     if (!userPos && boatRef.current) {
       boatRef.current.remove();
@@ -979,9 +994,11 @@ function PirateMap({
     }
   }, [userPos]);
 
+  /* Centrage automatique sur le bateau en mode terrain */
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !userPos) return;
+    /* Seulement si hors du viewport visible */
     if (!map.getBounds().contains([userPos.lat, userPos.lng])) {
       map.panTo([userPos.lat, userPos.lng], {
         animate: true,
@@ -989,7 +1006,6 @@ function PirateMap({
       });
     }
   }, [userPos]);
-
   return /*#__PURE__*/React.createElement("div", {
     style: {
       position: "relative"
@@ -1085,16 +1101,14 @@ function PirateMap({
    ================================================================ */
 function App() {
   const [stage, setStage] = useState("intro");
-  const [gpsHeading, setGpsHeading] = useState(0);
-  const [lastGpsPos, setLastGpsPos] = useState(null);
-  const [isMoving, setIsMoving] = useState(false);
   const [level, setLevel] = useState(null);
-  const [mode, setMode] = useState("field");
   const [points, setPoints] = useState([]);
   const [aIdx, setAIdx] = useState(0);
   const [userPos, setUserPos] = useState(null);
   const [dist, setDist] = useState(null);
   const [geoErr, setGeoErr] = useState(null);
+  const [oPerm, setOPerm] = useState("unknown");
+  const [heading, setHeading] = useState(0);
   const [unlocked, setUnlocked] = useState([]);
   const [solved, setSolved] = useState([]);
   const [tokens, setTokens] = useState([]);
@@ -1109,67 +1123,116 @@ function App() {
   const [elapsed, setElapsed] = useState(0);
   const [records, setRecords] = useState(EMPTY_REC);
   const [mapOpen, setMapOpen] = useState(false);
-  const [returning, setReturning] = useState(false);
-  const [distReturn, setDistReturn] = useState(null);
+  const [returning, setReturning] = useState(false); // phase retour au départ après dernière énigme
+  const [distReturn, setDistReturn] = useState(null); // distance au point de départ
   const RETURN_RADIUS = 40;
   const [rentalMinutes, setRentalMinutes] = useState(90);
   const geoRef = useRef(null);
+  const gpsHeadingRef = useRef(null);
+  const gpsHeadingTimer = useRef(null);
   const lCfg = level ? LEVELS[level] : null;
   const curPt = stage === "playing" ? points[aIdx] : undefined;
   const pct = points.length ? Math.round(solved.length / points.length * 100) : 0;
 
+  /* Compte à rebours location */
   const rentalMs = rentalMinutes * 60 * 1000;
   const remainingMs = Math.max(0, rentalMs - elapsed);
   const countdownPct = Math.max(0, Math.min(100, remainingMs / rentalMs * 100));
   const isWarning = remainingMs <= 15 * 60 * 1000 && remainingMs > 5 * 60 * 1000;
   const isDanger = remainingMs <= 5 * 60 * 1000;
-  const countdownColor = isDanger ? "#c0392b" : isWarning ? "#d97706" : "#1d5c3b"; // Boussole basée sur le cap GPS
-  useEffect(() => {
-    if (!userPos) return;
-    if (lastGpsPos) {
-      const d = havDist(lastGpsPos, userPos);
-      if (d >= 3) {
-        const course = bearing(lastGpsPos, userPos);
-        setGpsHeading(course);
-        setIsMoving(true);
-        setLastGpsPos(userPos);
-      } else {
-        setIsMoving(false);
-      }
-    } else {
-      setLastGpsPos(userPos);
-    }
-  }, [userPos, lastGpsPos]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (userPos) setLastGpsPos(userPos);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [userPos]);
+  const countdownColor = isDanger ? "#c0392b" : isWarning ? "#d97706" : "#1d5c3b";
 
   /* localStorage */
   useEffect(() => {
     try {
       const s = localStorage.getItem(SK);
-      if (s) setRecords({ ...EMPTY_REC, ...JSON.parse(s) });
+      if (s) setRecords({
+        ...EMPTY_REC,
+        ...JSON.parse(s)
+      });
     } catch {}
   }, []);
-
   const saveRec = useCallback((lv, t) => {
     setRecords(p => {
       const c = p[lv];
       if (c !== null && c <= t) return p;
-      const n = { ...p, [lv]: t };
-      try { localStorage.setItem(SK, JSON.stringify(n)); } catch {}
+      const n = {
+        ...p,
+        [lv]: t
+      };
+      try {
+        localStorage.setItem(SK, JSON.stringify(n));
+      } catch {}
       return n;
     });
   }, []);
+  const reqOrient = useCallback(async () => {
+    try {
+      const D = window.DeviceOrientationEvent;
+      if (!D) {
+        setOPerm("denied");
+        return;
+      }
+      if (typeof D.requestPermission === "function") {
+        const r = await D.requestPermission();
+        setOPerm(r === "granted" ? "granted" : "denied");
+      } else setOPerm("granted");
+    } catch {
+      setOPerm("denied");
+    }
+  }, []);
+  useEffect(() => {
+    if (oPerm !== "granted") return;
+
+    // Fallback gyroscope — utilisé seulement quand GPS heading indisponible (immobile)
+    // On lisse en espace sin/cos pour éviter les sauts à 0°/360°
+    let ssin = 0, scos = 1, hasAbs = false;
+    const ALPHA = 0.12; // lissage fort = moins de tremblement
+
+    const process = (raw) => {
+      const rad = raw * Math.PI / 180;
+      ssin = ssin * (1 - ALPHA) + Math.sin(rad) * ALPHA;
+      scos = scos * (1 - ALPHA) + Math.cos(rad) * ALPHA;
+      const smooth = (Math.atan2(ssin, scos) * 180 / Math.PI + 360) % 360;
+      // N'écrase le heading GPS que si on est immobile (le GPS ne nous donne pas de cap)
+      setHeading(h => {
+        // Si le GPS nous a donné un cap récemment (stocké via gpsHeadingRef), on le garde
+        if (gpsHeadingRef.current !== null) return h;
+        return Math.round(smooth * 10) / 10;
+      });
+    };
+
+    const hAbs = e => {
+      hasAbs = true;
+      if (typeof e.alpha !== "number") return;
+      const screenAngle = window.screen?.orientation?.angle ?? 0;
+      const raw = (360 - e.alpha + screenAngle) % 360;
+      process(raw);
+    };
+    const hRel = e => {
+      if (hasAbs) return; // ignorer si on a l'absolu
+      if (typeof e.webkitCompassHeading === "number" && e.webkitCompassHeading >= 0) {
+        process(e.webkitCompassHeading); // iOS — fiable directement
+        return;
+      }
+      if (typeof e.alpha !== "number") return;
+      const screenAngle = window.screen?.orientation?.angle ?? 0;
+      const raw = (360 - e.alpha + screenAngle) % 360;
+      process(raw);
+    };
+
+    window.addEventListener("deviceorientationabsolute", hAbs, true);
+    window.addEventListener("deviceorientation", hRel, true);
+    return () => {
+      window.removeEventListener("deviceorientationabsolute", hAbs, true);
+      window.removeEventListener("deviceorientation", hRel, true);
+    };
+  }, [oPerm]);
 
   /* GPS terrain */
   useEffect(() => {
     if (stage !== "playing") {
-      if (geoRef.current) {
+      if (geoRef.current !== null && "geolocation" in navigator) {
         navigator.geolocation.clearWatch(geoRef.current);
         geoRef.current = null;
       }
@@ -1186,71 +1249,95 @@ function App() {
         lng: p.coords.longitude,
         accuracy: p.coords.accuracy ?? 0
       });
+      // coords.heading = cap de déplacement GPS (0=Nord, NaN si immobile)
+      if (typeof p.coords.heading === "number" && !isNaN(p.coords.heading) && p.coords.speed > 0.3) {
+        gpsHeadingRef.current = p.coords.heading;
+        setHeading(p.coords.heading);
+        // Expirer le cap GPS après 3s d'immobilité → retour au gyroscope
+        if (gpsHeadingTimer.current) clearTimeout(gpsHeadingTimer.current);
+        gpsHeadingTimer.current = setTimeout(() => { gpsHeadingRef.current = null; }, 3000);
+      }
     }, e => setGeoErr(e.message || "Accès GPS refusé."), {
       enableHighAccuracy: true,
       maximumAge: 1000,
       timeout: 10000
     });
     return () => {
-      if (geoRef.current) {
+      if (geoRef.current !== null) {
         navigator.geolocation.clearWatch(geoRef.current);
         geoRef.current = null;
       }
     };
   }, [stage]);
 
+  /* Arrivée au point de départ (terrain réel) */
   useEffect(() => {
     if (!returning || distReturn === null) return;
     if (distReturn <= RETURN_RADIUS) {
-      setElapsed(Date.now() - (tStart ?? Date.now()));
+      const tot = Date.now() - (tStart ?? Date.now());
+      setElapsed(tot);
       setReturning(false);
       setStage("vault");
     }
   }, [returning, distReturn, tStart]);
 
+  /* Timer */
   useEffect(() => {
     if (stage !== "playing" || !tStart) return;
     const id = setInterval(() => setElapsed(Date.now() - tStart), 1000);
     return () => clearInterval(id);
   }, [stage, tStart]);
 
+  /* Distance & unlock */
   useEffect(() => {
-    if (!userPos || !curPt) { setDist(null); return; }
+    if (!userPos || !curPt) {
+      setDist(null);
+      return;
+    }
     setDist(havDist(userPos, curPt.location));
   }, [userPos, curPt]);
-
   useEffect(() => {
     if (!curPt || dist === null) return;
     if (dist <= curPt.radius) setUnlocked(p => p.includes(curPt.id) ? p : [...p, curPt.id]);
   }, [curPt, dist]);
 
+  /* Distance au point de départ (phase returning) */
   useEffect(() => {
-    if (!returning || !userPos) { setDistReturn(null); return; }
+    if (!returning || !userPos) {
+      setDistReturn(null);
+      return;
+    }
     setDistReturn(havDist(userPos, PLAY_ZONE[0]));
   }, [returning, userPos]);
 
+  /* Boussole — pointe vers la cible active ou vers le départ si returning */
   const brgTarget = useMemo(() => {
     if (!userPos) return null;
     if (returning) return PLAY_ZONE[0];
     return curPt?.location ?? null;
   }, [userPos, returning, curPt]);
-
   const brg = useMemo(() => !userPos || !brgTarget ? 0 : bearing(userPos, brgTarget), [userPos, brgTarget]);
+  const rot = useMemo(() => {
+    const h = oPerm === "granted" ? heading : 0;
+    return (brg - h + 360) % 360;
+  }, [brg, heading, oPerm]);
 
-  // Utiliser le cap GPS pour la boussole
-  const compassHeading = isMoving ? gpsHeading : 0;
-
+  /* Route summary */
   const routeSummary = useMemo(() => points.map((p, i) => ({
     point: p,
     status: solved.includes(p.id) ? "done" : stage === "playing" && i === aIdx ? "current" : stage === "briefing" && i === 0 ? "current" : "upcoming"
   })), [points, solved, aIdx, stage]);
 
-  const startGame = (lv) => {
+  /* Démarrer une partie */
+  const startGame = (lv, md = "field") => {
     const cfg = LEVELS[lv];
     const pool = FINAL_WORDS[cfg.points];
     const base = pool[Math.floor(Math.random() * pool.length)];
-    const obj = { ...base, hints: shuffle(base.hints) };
-    const toks = (base.tokens?.length === cfg.points ? base.tokens : splitWord(obj.word.toUpperCase(), cfg.points)).map(t => t.toUpperCase());
+    const obj = {
+      ...base,
+      hints: shuffle(base.hints)
+    };
+    const toks = (base.tokens && base.tokens.length === cfg.points ? base.tokens : splitWord(obj.word.toUpperCase(), cfg.points)).map(t => t.toUpperCase());
     const puzz = shuffle(RIDDLES).slice(0, cfg.points);
     const gen = toks.map((tok, i) => ({
       id: i + 1,
@@ -1259,7 +1346,10 @@ function App() {
       riddle: puzz[i] ?? RIDDLES[i % RIDDLES.length],
       reward: tok
     }));
-    const routed = shuffle(gen).map((p, i) => ({ ...p, id: i + 1 }));
+    const routed = shuffle(gen).map((p, i) => ({
+      ...p,
+      id: i + 1
+    }));
     setLevel(lv);
     setPoints(routed);
     setObjective(obj);
@@ -1271,24 +1361,26 @@ function App() {
     setUnlocked([]);
     setSolved([]);
     setTokens([]);
-    setAns(""); setAnsFb(null);
-    setGuess(""); setGuessFb(null);
-    setOpened(false); setMood("idle");
+    setAns("");
+    setAnsFb(null);
+    setGuess("");
+    setGuessFb(null);
+    setOpened(false);
+    setMood("idle");
     setGeoErr(null);
-    setTStart(null); setElapsed(0);
-    setGpsHeading(0);
-    setLastGpsPos(null);
-    setIsMoving(false);
-    setReturning(false); setDistReturn(null);
+    setTStart(null);
+    setElapsed(0);
+    setOPerm("unknown");
+    setHeading(0);
+    setReturning(false);
+    setDistReturn(null);
   };
-
   const beginMission = () => {
     setStage("playing");
     setMapOpen(false);
     setTStart(Date.now());
     setElapsed(0);
   };
-
   const handleRiddle = () => {
     if (!curPt || !ans.trim()) return;
     if (!matchAns(ans, curPt.riddle.answers)) {
@@ -1303,13 +1395,13 @@ function App() {
       setAnsFb(null);
       setAns("");
       if (next >= points.length) {
+        /* Toutes les énigmes résolues → retour au point de départ */
         setReturning(true);
       } else {
         setAIdx(p => Math.min(p + 1, points.length - 1));
       }
     }, 1700);
   };
-
   const handleFinal = () => {
     if (!objective || !guess.trim()) return;
     if (matchAns(guess, [objective.word])) {
@@ -1323,44 +1415,139 @@ function App() {
       setGuessFb(`${CAPTAIN} secoue la tête : ce mot ne correspond pas.`);
     }
   };
-
   const resetGame = () => {
-    if (geoRef.current) {
-      navigator.geolocation.clearWatch(geoRef.current);
-      geoRef.current = null;
-    }
-    setStage("intro"); setMapOpen(false); setMode("field");
-    setLevel(null); setPoints([]); setAIdx(0);
-    setUserPos(null); setDist(null); setGeoErr(null);
-    setUnlocked([]); setSolved([]); setTokens([]);
-    setObjective(null); setGuess(""); setGuessFb(null);
-    setOpened(false); setMood("idle"); setTStart(null);
-    setElapsed(0); setAns(""); setAnsFb(null);
-    setReturning(false); setDistReturn(null);
-    setGpsHeading(0);        
-    setLastGpsPos(null);     
-    setIsMoving(false);
+  if (geoRef.current !== null && "geolocation" in navigator) {
+    navigator.geolocation.clearWatch(geoRef.current);
+    geoRef.current = null;
+  }
+    setStage("intro");
+    setMapOpen(false);
+    setLevel(null);
+    setPoints([]);
+    setAIdx(0);
+    setUserPos(null);
+    setDist(null);
+    setGeoErr(null);
+    setUnlocked([]);
+    setSolved([]);
+    setTokens([]);
+    setObjective(null);
+    setGuess("");
+    setGuessFb(null);
+    setOpened(false);
+    setMood("idle");
+    setTStart(null);
+    setElapsed(0);
+    setAns("");
+    setAnsFb(null);
+    setReturning(false);
+    setDistReturn(null);
   };
 
+  /* Props pour PirateMap */
   const isOutside = !!userPos && !inPoly(userPos, PLAY_ZONE);
 
+  /* Styles */
   const S = {
-    page: { position: "relative", minHeight: "100vh", overflow: "hidden" },
-    wrap: { position: "relative", zIndex: 10, maxWidth: 560, margin: "0 auto", display: "flex", flexDirection: "column", gap: "1.5rem", padding: "1.5rem 1rem" },
-    row: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" },
-    col: { display: "flex", flexDirection: "column", gap: ".75rem" },
-    txt: { fontSize: ".9rem", lineHeight: 1.65, color: "#3b1b0b" },
-    txts: { fontSize: ".8rem", color: "#593018" },
-    sep: { borderTop: "1px dashed rgba(64,32,12,.22)", margin: ".25rem 0" },
-    ptrack: { height: 8, borderRadius: 99, background: "rgba(58,33,15,.18)", overflow: "hidden" },
-    pfill: w => ({ height: "100%", borderRadius: 99, background: "linear-gradient(to right,#fbbf24,#f97316)", width: `${w}%`, transition: "width .5s" }),
-    li: st => ({ display: "flex", alignItems: "center", justifyContent: "space-between", borderRadius: 14, border: `1px solid ${st==="done"?"rgba(34,197,94,.4)":st==="current"?"rgba(245,158,11,.55)":"rgba(73,38,13,.55)"}`, background: st==="done"?"rgba(16,185,129,.08)":st==="current"?"rgba(253,230,138,.15)":"rgba(58,33,15,.07)", padding: "8px 12px" }),
-    inp: { width: "100%", fontFamily: "IM Fell English,serif", fontSize: "1.05rem", color: "#3b1b0b", background: "rgba(255,255,255,.65)", border: "1.5px solid rgba(73,38,13,.75)", borderRadius: 12, padding: ".7rem 1rem", outline: "none" },
-    inpBig: { width: "100%", fontFamily: "IM Fell English,serif", fontSize: "1.4rem", color: "#3b1b0b", background: "rgba(255,255,255,.65)", border: "1.5px solid rgba(73,38,13,.75)", borderRadius: 12, padding: ".7rem 1rem", outline: "none", textAlign: "center", letterSpacing: ".4em" },
-    badge: c => ({ display: "inline-flex", alignItems: "center", gap: 4, borderRadius: 99, padding: "2px 10px", fontSize: ".72rem", fontWeight: 600, letterSpacing: ".04em", background: c==="teal"?"rgba(13,92,99,.12)":"rgba(139,37,0,.12)", color: c==="teal"?"#1d5c3b":"#7a1f1f", border: `1px solid ${c==="teal"?"rgba(13,92,99,.3)":"rgba(139,37,0,.3)"}` })
+    page: {
+      position: "relative",
+      minHeight: "100vh",
+      overflow: "hidden"
+    },
+    wrap: {
+      position: "relative",
+      zIndex: 10,
+      maxWidth: 560,
+      margin: "0 auto",
+      display: "flex",
+      flexDirection: "column",
+      gap: "1.5rem",
+      padding: "1.5rem 1rem"
+    },
+    row: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: "1rem"
+    },
+    col: {
+      display: "flex",
+      flexDirection: "column",
+      gap: ".75rem"
+    },
+    txt: {
+      fontSize: ".9rem",
+      lineHeight: 1.65,
+      color: "#3b1b0b"
+    },
+    txts: {
+      fontSize: ".8rem",
+      color: "#593018"
+    },
+    sep: {
+      borderTop: "1px dashed rgba(64,32,12,.22)",
+      margin: ".25rem 0"
+    },
+    ptrack: {
+      height: 8,
+      borderRadius: 99,
+      background: "rgba(58,33,15,.18)",
+      overflow: "hidden"
+    },
+    pfill: w => ({
+      height: "100%",
+      borderRadius: 99,
+      background: "linear-gradient(to right,#fbbf24,#f97316)",
+      width: `${w}%`,
+      transition: "width .5s"
+    }),
+    li: st => ({
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      borderRadius: 14,
+      border: `1px solid ${st === "done" ? "rgba(34,197,94,.4)" : st === "current" ? "rgba(245,158,11,.55)" : "rgba(73,38,13,.55)"}`,
+      background: st === "done" ? "rgba(16,185,129,.08)" : st === "current" ? "rgba(253,230,138,.15)" : "rgba(58,33,15,.07)",
+      padding: "8px 12px"
+    }),
+    inp: {
+      width: "100%",
+      fontFamily: "IM Fell English,serif",
+      fontSize: "1.05rem",
+      color: "#3b1b0b",
+      background: "rgba(255,255,255,.65)",
+      border: "1.5px solid rgba(73,38,13,.75)",
+      borderRadius: 12,
+      padding: ".7rem 1rem",
+      outline: "none"
+    },
+    inpBig: {
+      width: "100%",
+      fontFamily: "IM Fell English,serif",
+      fontSize: "1.4rem",
+      color: "#3b1b0b",
+      background: "rgba(255,255,255,.65)",
+      border: "1.5px solid rgba(73,38,13,.75)",
+      borderRadius: 12,
+      padding: ".7rem 1rem",
+      outline: "none",
+      textAlign: "center",
+      letterSpacing: ".4em"
+    },
+    badge: c => ({
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 4,
+      borderRadius: 99,
+      padding: "2px 10px",
+      fontSize: ".72rem",
+      fontWeight: 600,
+      letterSpacing: ".04em",
+      background: c === "teal" ? "rgba(13,92,99,.12)" : "rgba(139,37,0,.12)",
+      color: c === "teal" ? "#1d5c3b" : "#7a1f1f",
+      border: `1px solid ${c === "teal" ? "rgba(13,92,99,.3)" : "rgba(139,37,0,.3)"}`
+    })
   };
-
-  // Rendu simplifié pour la boussole GPS
   return /*#__PURE__*/React.createElement("div", {
     style: S.page
   }, /*#__PURE__*/React.createElement("div", {
@@ -1958,107 +2145,135 @@ function App() {
       padding: "1.5rem 2rem"
     }
   }, /*#__PURE__*/React.createElement("div", {
-    style: { display:"flex", flexDirection:"column", alignItems:"center", gap:"1rem" }
+    style: { display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }
   },
-  /*#__PURE__*/React.createElement("div", { className:"compass-wrap" },
-    /*#__PURE__*/React.createElement("svg", {
-      viewBox:"0 0 240 240",
-      style:{width:240,height:240,overflow:"visible"}
-    },
-      /*#__PURE__*/React.createElement("defs", null,
-        /*#__PURE__*/React.createElement("radialGradient", {id:"cgBg",cx:"35%",cy:"35%",r:"60%"},
-          /*#__PURE__*/React.createElement("stop", {offset:"0%", stopColor:"#fef6df"}),
-          /*#__PURE__*/React.createElement("stop", {offset:"60%", stopColor:"#e2b877"}),
-          /*#__PURE__*/React.createElement("stop", {offset:"100%", stopColor:"#b37230"})
-        ),
-        /*#__PURE__*/React.createElement("radialGradient", {id:"cgRing",cx:"50%",cy:"50%",r:"50%"},
-          /*#__PURE__*/React.createElement("stop", {offset:"60%", stopColor:"#3d1f08"}),
-          /*#__PURE__*/React.createElement("stop", {offset:"100%", stopColor:"#1a0a03"})
-        ),
-        /*#__PURE__*/React.createElement("filter", {id:"cgShadow"},
-          /*#__PURE__*/React.createElement("feDropShadow", {dx:"0",dy:"4",stdDeviation:"6",floodOpacity:"0.5"})
-        ),
-        /*#__PURE__*/React.createElement("filter", {id:"cgArrowGlow"},
-          /*#__PURE__*/React.createElement("feDropShadow", {dx:"0",dy:"0",stdDeviation:"3",floodColor:"#f97316",floodOpacity:"0.7"})
-        )
+  /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative",
+      width: 240,
+      height: 240,
+      flexShrink: 0,
+      "--dial-rot": `rotate(${(360 - heading).toFixed(1)}deg)`,
+      "--arrow-rot": `rotate(${brg.toFixed(1)}deg)`
+    }
+  },
+  /*#__PURE__*/React.createElement("svg", {
+    viewBox: "0 0 240 240",
+    width: 240, height: 240,
+    style: { overflow: "visible", display: "block" }
+  },
+    /*#__PURE__*/React.createElement("defs", null,
+      /*#__PURE__*/React.createElement("radialGradient", { id: "cgFace", cx: "35%", cy: "30%", r: "65%" },
+        /*#__PURE__*/React.createElement("stop", { offset: "0%",   stopColor: "#fef6df" }),
+        /*#__PURE__*/React.createElement("stop", { offset: "55%",  stopColor: "#e8c87a" }),
+        /*#__PURE__*/React.createElement("stop", { offset: "100%", stopColor: "#b37230" })
       ),
-      /*#__PURE__*/React.createElement("circle", {cx:"120",cy:"120",r:"115",fill:"url(#cgRing)",filter:"url(#cgShadow)"}),
-      /*#__PURE__*/React.createElement("g", {
-        style:{transform:`rotate(${-compassHeading}deg)`,transformOrigin:"120px 120px",transition:"transform .15s ease-out"}
-      },
-        ...Array.from({length:72},(_,i)=>{
-          const a = (i*5) * Math.PI/180;
-          const major = i%18===0, mid = i%9===0;
-          const r1 = major?92:mid?95:97, r2=108;
-          return /*#__PURE__*/React.createElement("line", {
-            key:"tick"+i,
-            x1: 120+r1*Math.sin(a), y1: 120-r1*Math.cos(a),
-            x2: 120+r2*Math.sin(a), y2: 120-r2*Math.cos(a),
-            stroke: major?"#f7c560":mid?"rgba(247,197,96,.6)":"rgba(247,197,96,.3)",
-            strokeWidth: major?2:mid?1.5:1
-          });
-        }),
-        ...["N","E","S","O"].map((label,i)=>{
-          const a = (i*90) * Math.PI/180;
-          const r = 80;
-          const isNord = label==="N";
-          return /*#__PURE__*/React.createElement("text", {
-            key:"card"+i,
-            x: 120+r*Math.sin(a),
-            y: 120-r*Math.cos(a)+5,
-            textAnchor:"middle",
-            fontSize: isNord?16:13,
-            fontWeight: isNord?"bold":"normal",
-            fontFamily:"Pirata One,serif",
-            fill: isNord?"#f97316":"#f7c560",
-            style:{userSelect:"none"}
-          }, label);
-        }),
-        ...["NE","SE","SO","NO"].map((label,i)=>{
-          const a = ((i*90+45)) * Math.PI/180;
-          const r = 80;
-          return /*#__PURE__*/React.createElement("text", {
-            key:"inter"+i,
-            x: 120+r*Math.sin(a),
-            y: 120-r*Math.cos(a)+4,
-            textAnchor:"middle",
-            fontSize:9,
-            fontFamily:"Pirata One,serif",
-            fill:"rgba(247,197,96,.55)",
-            style:{userSelect:"none"}
-          }, label);
-        })
+      /*#__PURE__*/React.createElement("radialGradient", { id: "cgRim", cx: "50%", cy: "50%", r: "50%" },
+        /*#__PURE__*/React.createElement("stop", { offset: "0%",   stopColor: "#4a2510" }),
+        /*#__PURE__*/React.createElement("stop", { offset: "100%", stopColor: "#1a0803" })
       ),
-      /*#__PURE__*/React.createElement("circle", {cx:"120",cy:"120",r:"62",fill:"url(#cgBg)",stroke:"rgba(44,22,9,.3)",strokeWidth:"1.5"}),
-      /*#__PURE__*/React.createElement("circle", {cx:"120",cy:"120",r:"58",fill:"none",stroke:"rgba(44,22,9,.18)",strokeWidth:"1"}),
-      /*#__PURE__*/React.createElement("g", {
-        style:{transform:`rotate(${brg}deg)`,transformOrigin:"120px 120px",transition:"transform .4s ease-out"},
-        filter:"url(#cgArrowGlow)"
-      },
-        /*#__PURE__*/React.createElement("polygon", {
-          points:"120,65 126,95 114,95",
-          fill:"#f97316",stroke:"#7a3912",strokeWidth:"1"
-        }),
-        /*#__PURE__*/React.createElement("rect", {
-          x:"116",y:"95",width:"8",height:"30",
-          fill:"#1f6d45",stroke:"rgba(15,47,32,.6)",strokeWidth:"1",rx:"2"
-        }),
-        /*#__PURE__*/React.createElement("polygon", {
-          points:"120,175 126,145 114,145",
-          fill:"rgba(15,47,32,.7)",stroke:"rgba(15,47,32,.4)",strokeWidth:"1"
-        })
+      /*#__PURE__*/React.createElement("filter", { id: "cgShadow", x: "-20%", y: "-20%", width: "140%", height: "140%" },
+        /*#__PURE__*/React.createElement("feDropShadow", { dx: "0", dy: "6", stdDeviation: "8", floodOpacity: "0.55" })
       ),
-      /*#__PURE__*/React.createElement("circle", {cx:"120",cy:"120",r:"9",fill:"radial-gradient(circle,#fff8e6,#8c4b1a)",stroke:"#3b1b0b",strokeWidth:"2.5"}),
-      /*#__PURE__*/React.createElement("circle", {cx:"120",cy:"120",r:"4",fill:"#3b1b0b"})
+      /*#__PURE__*/React.createElement("filter", { id: "cgGlow" },
+        /*#__PURE__*/React.createElement("feDropShadow", { dx: "0", dy: "0", stdDeviation: "4", floodColor: "#f97316", floodOpacity: "0.8" })
+      )
     ),
-    /*#__PURE__*/React.createElement("div", {
-      style:{position:"absolute",bottom:4,left:"50%",transform:"translateX(-50%)",
-        whiteSpace:"nowrap",background:"rgba(26,16,8,.8)",borderRadius:99,
-        padding:"2px 10px",fontSize:"11px",fontFamily:"IM Fell English,serif",
-        color: isMoving ? "#86efac" : "#fbbf24",
-        border:"1px solid rgba(247,197,96,.3)"}
-    }, isMoving ? "⚓ Cap GPS actif" : "📍 En attente de déplacement")
-  )), /*#__PURE__*/React.createElement("div", {
+
+    /* ── Boîtier extérieur ── */
+    /*#__PURE__*/React.createElement("circle", { cx: "120", cy: "120", r: "116", fill: "url(#cgRim)", filter: "url(#cgShadow)" }),
+    /*#__PURE__*/React.createElement("circle", { cx: "120", cy: "120", r: "104", fill: "none", stroke: "rgba(200,150,60,.3)", strokeWidth: "1" }),
+
+    /* ── Cadran rotatif (tourne avec le heading) ── */
+    /*#__PURE__*/React.createElement("g", {
+      style: { transform: "var(--dial-rot)", transformOrigin: "120px 120px", transition: "transform 0.5s cubic-bezier(0.25,0.46,0.45,0.94)" }
+    },
+      /*#__PURE__*/React.createElement("circle", { cx: "120", cy: "120", r: "100", fill: "url(#cgFace)" }),
+
+      /* Graduations majeures */
+      ...[0,30,60,90,120,150,180,210,240,270,300,330].map(deg => {
+        const r = deg * Math.PI / 180;
+        return /*#__PURE__*/React.createElement("line", { key: "maj"+deg,
+          x1: 120 + 83*Math.sin(r), y1: 120 - 83*Math.cos(r),
+          x2: 120 + 97*Math.sin(r), y2: 120 - 97*Math.cos(r),
+          stroke: "#7a4a20", strokeWidth: "2.5", strokeLinecap: "round"
+        });
+      }),
+
+      /* Graduations intermédiaires */
+      ...[15,45,75,105,135,165,195,225,255,285,315,345].map(deg => {
+        const r = deg * Math.PI / 180;
+        return /*#__PURE__*/React.createElement("line", { key: "int"+deg,
+          x1: 120 + 88*Math.sin(r), y1: 120 - 88*Math.cos(r),
+          x2: 120 + 97*Math.sin(r), y2: 120 - 97*Math.cos(r),
+          stroke: "rgba(122,74,32,.5)", strokeWidth: "1.5", strokeLinecap: "round"
+        });
+      }),
+
+      /* Graduations mineures */
+      ...[...Array(72).keys()].filter(i => i%3!==0).map(i => {
+        const r = (i*5) * Math.PI / 180;
+        return /*#__PURE__*/React.createElement("line", { key: "min"+i,
+          x1: 120 + 92*Math.sin(r), y1: 120 - 92*Math.cos(r),
+          x2: 120 + 97*Math.sin(r), y2: 120 - 97*Math.cos(r),
+          stroke: "rgba(122,74,32,.3)", strokeWidth: "1", strokeLinecap: "round"
+        });
+      }),
+
+      /*#__PURE__*/React.createElement("circle", { cx: "120", cy: "120", r: "82", fill: "none", stroke: "rgba(122,74,32,.25)", strokeWidth: "1" }),
+      /*#__PURE__*/React.createElement("circle", { cx: "120", cy: "120", r: "65", fill: "none", stroke: "rgba(122,74,32,.15)", strokeWidth: "0.8" }),
+
+      /*#__PURE__*/React.createElement("text", { x: "120", y: "57",  textAnchor: "middle", fontFamily: "Pirata One,serif", fontSize: "18", fontWeight: "bold", fill: "#c0392b" }, "N"),
+      /*#__PURE__*/React.createElement("text", { x: "183", y: "125", textAnchor: "middle", fontFamily: "Pirata One,serif", fontSize: "14", fill: "#4a2510" }, "E"),
+      /*#__PURE__*/React.createElement("text", { x: "120", y: "193", textAnchor: "middle", fontFamily: "Pirata One,serif", fontSize: "14", fill: "#4a2510" }, "S"),
+      /*#__PURE__*/React.createElement("text", { x: "57",  y: "125", textAnchor: "middle", fontFamily: "Pirata One,serif", fontSize: "14", fill: "#4a2510" }, "O"),
+
+      /*#__PURE__*/React.createElement("text", { x: "168", y: "72",  textAnchor: "middle", fontFamily: "Pirata One,serif", fontSize: "9", fill: "rgba(74,37,16,.6)" }, "NE"),
+      /*#__PURE__*/React.createElement("text", { x: "168", y: "172", textAnchor: "middle", fontFamily: "Pirata One,serif", fontSize: "9", fill: "rgba(74,37,16,.6)" }, "SE"),
+      /*#__PURE__*/React.createElement("text", { x: "72",  y: "172", textAnchor: "middle", fontFamily: "Pirata One,serif", fontSize: "9", fill: "rgba(74,37,16,.6)" }, "SO"),
+      /*#__PURE__*/React.createElement("text", { x: "72",  y: "72",  textAnchor: "middle", fontFamily: "Pirata One,serif", fontSize: "9", fill: "rgba(74,37,16,.6)" }, "NO"),
+
+      /*#__PURE__*/React.createElement("polygon", { points: "120,66 124,80 116,80", fill: "#c0392b", opacity: "0.4" })
+    ),
+
+    /* ── Flèche de direction ── */
+    /*#__PURE__*/React.createElement("g", {
+      style: { transform: "var(--arrow-rot)", transformOrigin: "120px 120px", transition: "transform 0.4s cubic-bezier(0.25,0.46,0.45,0.94)" },
+      filter: "url(#cgGlow)"
+    },
+      /*#__PURE__*/React.createElement("polygon", { points: "120,68 127,100 113,100", fill: "#f97316", stroke: "#7a3912", strokeWidth: "1.2" }),
+      /*#__PURE__*/React.createElement("rect",    { x: "115", y: "100", width: "10", height: "28", fill: "#f97316", stroke: "#7a3912", strokeWidth: "0.8", rx: "2" }),
+      /*#__PURE__*/React.createElement("polygon", { points: "120,172 127,142 113,142", fill: "#1a6b3f", stroke: "rgba(15,47,32,.5)", strokeWidth: "1" }),
+      /*#__PURE__*/React.createElement("rect",    { x: "115", y: "128", width: "10", height: "14", fill: "#1a6b3f", rx: "2" })
+    ),
+
+    /*#__PURE__*/React.createElement("circle", { cx: "120", cy: "120", r: "11", fill: "#c8860a", stroke: "#3b1b0b", strokeWidth: "2.5" }),
+    /*#__PURE__*/React.createElement("circle", { cx: "120", cy: "120", r: "5",  fill: "#3b1b0b" }),
+    /*#__PURE__*/React.createElement("circle", { cx: "120", cy: "120", r: "116", fill: "none", stroke: "rgba(200,150,60,.35)", strokeWidth: "1.5" })
+  ),
+
+  /* Badge source du cap */
+  /*#__PURE__*/React.createElement("div", {
+    style: {
+      position:"absolute", bottom:2, left:"50%", transform:"translateX(-50%)",
+      whiteSpace:"nowrap", background:"rgba(26,16,8,.82)", borderRadius:99,
+      padding:"2px 10px", fontSize:"10px", fontFamily:"IM Fell English,serif",
+      color: gpsHeadingRef.current !== null ? "#86efac" : oPerm==="granted" ? "#fbbf24" : "#f87171",
+      border:"1px solid rgba(247,197,96,.25)"
+    }
+  }, gpsHeadingRef.current !== null
+     ? "⚓ Cap GPS · " + Math.round(heading) + "°"
+     : oPerm==="granted"
+       ? "🧭 Gyroscope · " + Math.round(heading) + "°"
+       : "🧭 Boussole inactive"
+  )
+),
+oPerm !== "granted" && /*#__PURE__*/React.createElement("button", {
+    className: "btn btn-ghost",
+    style: { width: "100%" },
+    onClick: reqOrient
+  }, "🧭 Activer la boussole")
+  ), /*#__PURE__*/React.createElement("div", {
     style: S.sep
   }), /*#__PURE__*/React.createElement("div", {
     style: S.col
@@ -2068,7 +2283,7 @@ function App() {
       color: "#4b2a17",
       fontSize: ".9rem"
     }
-  }, "Conseils"), (returning ? ["La boussole pointe vers le ponton de départ.", "Rejoins la zone marquée ★ sur la carte pour ouvrir le coffre.", "Le chrono continue jusqu'à ton retour !"] : ["Déplace-toi pour activer le cap GPS.", "La flèche orange pointe vers ta balise.", "L'énigme apparaît dans le rayon de la balise."]).map(t => /*#__PURE__*/React.createElement("p", {
+  }, "Conseils"), (returning ? ["La boussole pointe vers le ponton de départ.", "Rejoins la zone marquée ★ sur la carte pour ouvrir le coffre.", "Le chrono continue jusqu'à ton retour !"] : ["Garde le téléphone à plat pour la boussole.", "L'énigme apparaît quand tu entres dans le rayon de la balise."]).map(t => /*#__PURE__*/React.createElement("p", {
     key: t,
     style: {
       ...S.txts,
@@ -2481,7 +2696,7 @@ function App() {
       minWidth: 140,
       padding: ".8rem"
     },
-    onClick: () => level && startGame(level, mode)
+    onClick: () => level && startGame(level)
   }, "Relancer une partie"), /*#__PURE__*/React.createElement("button", {
     className: "btn btn-ghost",
     style: {
@@ -2550,7 +2765,7 @@ function showInstallBanner() {
       <img src="icons/icon-72.png" width="44" height="44" style="border-radius:10px;flex-shrink:0" alt="icône"/>
       <div style="flex:1;min-width:0">
         <p style="font-family:'Pirata One',serif;font-size:.95rem;margin:0 0 2px;color:#f7c560">
-          ⚓ Installer Pirate Quest
+          ⚓ Installer Trésor Pirate
         </p>
         <p style="font-size:.78rem;opacity:.8;margin:0">
           Accès hors-ligne · Plein écran · GPS natif
@@ -2630,7 +2845,7 @@ if (isIOS && isSafari && !isStandalone) {
         text-align:center;box-shadow:0 -4px 24px rgba(0,0,0,.5);
       ">
         <p style="font-family:'Pirata One',serif;font-size:.95rem;color:#f7c560;margin:0 0 6px">
-          ⚓ Installer Pirate Quest sur iPhone
+          ⚓ Installer Trésor Pirate sur iPhone
         </p>
         <p style="font-size:.82rem;opacity:.85;margin:0 0 4px">
           Appuie sur <strong>⬆ Partager</strong> puis
