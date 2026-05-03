@@ -15,7 +15,7 @@ body { overflow-y: auto; overscroll-behavior-y: contain; touch-action: pan-x pan
 <title>Trésor Pirate — Lac du Der</title>
 
 <!-- PWA Manifest -->
-<link rel="manifest" href="manifest.json"/>
+<link rel="manifest" href="./manifest.json"/>
 
 <!-- iOS PWA support -->
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -2756,7 +2756,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(
 /* ── Enregistrement du Service Worker ── */
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js?v=2')
+    navigator.serviceWorker.register('./sw.js')
       .then(reg => {
          reg.onupdatefound = () => {
       const newWorker = reg.installing;
@@ -2902,7 +2902,7 @@ if (isIOS && isSafari && !isStandalone) {
 </script>
 <script>
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js?v=2').then(reg => {
+  navigator.serviceWorker.register('./sw.js').then(reg => {
 
     reg.onupdatefound = () => {
       const newWorker = reg.installing;
